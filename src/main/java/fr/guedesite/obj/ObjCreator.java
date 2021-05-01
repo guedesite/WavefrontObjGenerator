@@ -6,6 +6,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Formatter;
 import java.util.List;
 import java.util.Locale;
@@ -22,12 +23,23 @@ public class ObjCreator extends Thread {
 	private double scale = 1D;
 	private long timeInLog = 1000;
 	private int ThreadPrio = Thread.NORM_PRIORITY;
+	private boolean useThread = false;
+	
+	private VectorObj transform;
 	
 	public ObjCreator(String fileObj, String fileMtl) {
 		this.fileMtl = fileMtl;
 		this.fileObj = fileObj;
 		this.allShape = new ArrayList<Shape>();
 		this.allMaterial = new ArrayList<Material>();
+	}
+	
+	public void applyTransform(VectorObj vector) {
+		this.transform = vector;
+	}
+	
+	public void useThread(boolean value) {
+		this.useThread = true;
 	}
 	
 	public void setScale(double scale) {
@@ -82,11 +94,25 @@ public class ObjCreator extends Thread {
 
 	}
 	
+	public void addShape(Collection<Shape> c) {
+		this.allShape.addAll(c);
+		for(Shape s:c) {
+			if(!this.allMaterial.contains(s.getMaterial())) {
+				this.allMaterial.add(s.getMaterial());
+			}
+		}
+
+	}
+	
 	
 	public void process() {
-		this.setPriority(this.ThreadPrio);
-		this.setName("OBJ CREATOR MAIN");
-		this.start();
+		if(useThread) {
+			this.setPriority(this.ThreadPrio);
+			this.setName("OBJ CREATOR MAIN");
+			this.start();
+		} else {
+			this.run();
+		}
 	}
 	
 	private List<VectorObj> allV;
@@ -95,7 +121,7 @@ public class ObjCreator extends Thread {
 	private long maxLog;
 	
 	@Override
-	public void start() {
+	public void run() {
 		long startTime = System.currentTimeMillis();
 		this.log("Process start");
 		
@@ -107,7 +133,16 @@ public class ObjCreator extends Thread {
 		this.log("Adding all shape ...");
 		indexLog = 1;
 		maxLog = shapes.get().count();
-		shapes.get().forEach( x -> { this.allV.addAll(x.getStream().collect(Collectors.toList())); this.log("Add shape",indexLog,maxLog ); indexLog++;});
+		if(this.transform != null) {
+			shapes.get().forEach( x -> { this.allV.addAll(x.applyTransform(this.transform).collect(Collectors.toList())); 
+			
+			this.log("Add shape",indexLog,maxLog ); indexLog++;});
+		} else {
+			shapes.get().forEach( x -> { this.allV.addAll(x.getStream().collect(Collectors.toList())); 
+			
+			this.log("Add shape",indexLog,maxLog ); indexLog++;});
+		}
+
 		
 		Supplier<Stream<VectorObj>> allVertice = () -> this.allV.stream().distinct();
 		
@@ -133,24 +168,22 @@ public class ObjCreator extends Thread {
 		this.log("Writing face ...");
 		indexLog = 1;
 		maxLog = shapes.get().count();
-		materials.get().forEach( a -> { 
-			StringBuilder bld = new StringBuilder();
-			bld.append(a.toObj());
-			shapes.get().filter(
-					b -> b.getMaterial().equals(a)).forEach(c -> {
-						bld.append("f");
-						c.getStream().forEach(
-								d -> bld.append(" "+allVertice.get().filter(
-										e -> e.equals(d)
-								).findFirst().get().index)
-						);
-						bld.append("\n");
-						this.log("Write face", indexLog, maxLog);
-						indexLog++;
-					});
-			obj.print(bld.toString());
-			obj.close();
-		});
+		
+
+			materials.get().forEach( a -> { 
+				StringBuilder bld = new StringBuilder();
+				bld.append(a.toObj());
+				shapes.get().filter(
+						b -> b.getMaterial().equals(a)).forEach(c -> {
+							bld.append("f");
+							c.getStream().forEach(d -> bld.append(" "+d.index.index));
+							bld.append("\n");
+							this.log("Write face", indexLog, maxLog);
+							indexLog++;
+						});
+				obj.print(bld.toString());
+			});
+
 		
 		final PrintStream mtl = createPrintStream(this.fileMtl);
 		if(mtl == null)
@@ -192,6 +225,7 @@ public class ObjCreator extends Thread {
 		if(this.log != null) {
 			if(index == max || lastLog < System.currentTimeMillis() - this.timeInLog) {
 				this.log.log(info, index, max);
+				lastLog = System.currentTimeMillis();
 			}
 		}
 	}

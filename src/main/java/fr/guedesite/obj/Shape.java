@@ -1,25 +1,30 @@
 package fr.guedesite.obj;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public class Shape {
 
-	private Supplier<Stream<VectorObj>> VectorObj;
+	private List<VectorObj> VectorObj;
 	private Material material;
 	
-	private Shape(Supplier<Stream<VectorObj>> VectorObj,Material material) {
+	private Shape(List<VectorObj> VectorObj, Material  material) {
 		this.VectorObj = VectorObj;
 		this.material = material;
 	}
 	
 	public Stream<VectorObj> getStream() {
-		return this.VectorObj.get();
+		return this.VectorObj.stream();
+	}
+	
+	public List<VectorObj> getList() {
+		return this.VectorObj;
 	}
 	
 	public Supplier<Stream<VectorObj>> getStreamSupplier() {
-		return this.VectorObj;
+		return () -> this.VectorObj.stream();
 	}
 	
 	public Material getMaterial() {
@@ -27,7 +32,12 @@ public class Shape {
 	}
 	
 	public static Shape createShape(Material material,VectorObj... vector) {
-		return new Shape(() -> Arrays.stream(vector),material);
+		return new Shape(Arrays.asList(vector),material);
+	}
+	
+	public Stream<VectorObj> applyTransform(VectorObj vec) {
+		this.VectorObj.forEach(v->v.applytransform(vec));
+		return this.getStream();
 	}
 
 	@Override

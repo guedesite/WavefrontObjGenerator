@@ -8,6 +8,7 @@ public class Material {
 	private Color diffuse;
 	private Color ambient;
 	
+	
 	public Material(String name) {
 		this.name=name.replaceAll(" ", "_");
 	}
